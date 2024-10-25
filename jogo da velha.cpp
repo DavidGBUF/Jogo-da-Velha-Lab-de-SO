@@ -42,20 +42,30 @@ void exibirTabuleiro(const char tabuleiro[3][3]) {
 // Verifica se há um vencedor no tabuleiro e retorna o jogador vencedor (1 ou 2)
 // Retorna 0 caso não haja vencedor
 int conferirTabuleiro(const char tabuleiro[3][3]) {
-    // Verifica linhas e colunas para identificar um vencedor
     for (int i = 0; i < 3; i++) {
         if (tabuleiro[i][0] == tabuleiro[i][1] && tabuleiro[i][1] == tabuleiro[i][2] && tabuleiro[i][0] != '-')
             return (tabuleiro[i][0] == 'X') ? 1 : 2;
         if (tabuleiro[0][i] == tabuleiro[1][i] && tabuleiro[1][i] == tabuleiro[2][i] && tabuleiro[0][i] != '-')
             return (tabuleiro[0][i] == 'X') ? 1 : 2;
     }
-    // Verifica diagonais
     if (tabuleiro[0][0] == tabuleiro[1][1] && tabuleiro[1][1] == tabuleiro[2][2] && tabuleiro[0][0] != '-')
         return (tabuleiro[0][0] == 'X') ? 1 : 2;
     if (tabuleiro[0][2] == tabuleiro[1][1] && tabuleiro[1][1] == tabuleiro[2][0] && tabuleiro[0][2] != '-')
         return (tabuleiro[0][2] == 'X') ? 1 : 2;
 
     return 0;  // Nenhum vencedor
+}
+
+// Verifica se o tabuleiro está cheio e não há vencedor, indicando um empate
+bool verificarEmpate(const char tabuleiro[3][3]) {
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (tabuleiro[i][j] == '-') {
+                return false; // Há posições vazias, então ainda não é empate
+            }
+        }
+    }
+    return true; // Todas as posições estão preenchidas
 }
 
 // Exibe um mapa com instruções para orientar a escolha de posições
@@ -67,7 +77,6 @@ void exibirMapaInstrucoes() {
 void jogar(char simbolo, string nome, char tabuleiro[3][3], int posicoes[9][2], bool &ganhou) {
     while (!fimJogo) {
         unique_lock<mutex> lock(mtx);
-        // Espera o turno do jogador e que o jogo não tenha terminado
         cv.wait(lock, [=] { return (simbolo == 'X' ? turnoJogador1 : !turnoJogador1) && !fimJogo; });
 
         if (fimJogo) break;  // Sai do loop se o jogo já terminou
@@ -80,43 +89,48 @@ void jogar(char simbolo, string nome, char tabuleiro[3][3], int posicoes[9][2], 
         bool posicaoValida = false;
         string mensagem = "";
 
-        // Loop para garantir que o jogador insira uma posição válida
         while (!posicaoValida) {
             cout << mensagem << nome << ", digite uma posicao conforme o mapa (1-9): ";
             cin >> posicao;
 
-            // Valida se a posição está no intervalo correto
             if (posicao < 1 || posicao > 9) {
                 mensagem = "\nPosicao invalida! Tente novamente.\n";
                 continue;
             }
 
-            // Converte a posição escolhida para índices de linha e coluna no tabuleiro
             linha = posicoes[posicao - 1][0];
             coluna = posicoes[posicao - 1][1];
 
-            // Verifica se a posição está livre
             if (tabuleiro[linha][coluna] == '-') {
-                tabuleiro[linha][coluna] = simbolo;  // Marca o tabuleiro
+                tabuleiro[linha][coluna] = simbolo;
                 posicaoValida = true;
             } else {
                 mensagem = "\nEssa posicao ja foi jogada!\n";
             }
         }
 
-        // Verifica se o jogador venceu após sua jogada
         ganhou = (conferirTabuleiro(tabuleiro) == (simbolo == 'X' ? 1 : 2));
         if (ganhou) {
-            fimJogo = true;  // Marca o jogo como terminado
+            fimJogo = true;
             limparTela();
             exibirTabuleiro(tabuleiro);
             cout << "O jogador " << nome << " venceu!!!\n";
             cout << "Encerrando o jogo. Até mais!\n";
-            exit(0);  // Encerra o programa imediatamente após a vitória
+            exit(0);
         }
 
-        turnoJogador1 = !turnoJogador1;  // Alterna o turno para o próximo jogador
-        cv.notify_all();  // Notifica todas as threads para a mudança de turno
+        // Verificação de empate após a jogada
+        if (verificarEmpate(tabuleiro)) {
+            fimJogo = true;
+            limparTela();
+            exibirTabuleiro(tabuleiro);
+            cout << "\nEMPATE!!!\n";
+            cout << "Encerrando o jogo. Até mais!\n";
+            exit(0);
+        }
+
+        turnoJogador1 = !turnoJogador1;
+        cv.notify_all();
     }
 }
 
@@ -135,15 +149,6 @@ void jogo(string nome1, string nome2) {
 
     jogador1.join();  // Aguarda o término da thread do jogador 1
     jogador2.join();  // Aguarda o término da thread do jogador 2
-
-    // Verifica se o jogo terminou em empate
-    if (!ganhou1 && !ganhou2) {
-        limparTela();
-        exibirTabuleiro(tabuleiro);
-        cout << "\nEMPATE!!!\n";
-        cout << "Encerrando o jogo. Até mais!\n";
-        exit(0);  // Encerra o programa em caso de empate
-    }
 }
 
 // Função que exibe o menu principal do jogo
@@ -159,7 +164,7 @@ void menu() {
         switch (opcao) {
             case 1:
                 cout << "\nNome do jogador 1: ";
-                cin.ignore();  // Limpa o buffer de entrada
+                cin.ignore();
                 getline(cin, nome1);
                 cout << "Nome do jogador 2: ";
                 getline(cin, nome2);
@@ -169,7 +174,7 @@ void menu() {
                 limparTela();
                 cout << "\nEste jogo foi desenvolvido com o uso de threads e semáforos em 2024.\n1 - Voltar\n2 - Sair\nDigite: ";
                 cin >> opcao;
-                opcao = (opcao == 1) ? 0 : 3;  // Atualiza a opção conforme a escolha do usuário
+                opcao = (opcao == 1) ? 0 : 3;
                 break;
             case 3:
                 cout << "\nAte mais!!!\n";
