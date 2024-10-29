@@ -9,10 +9,10 @@
 using namespace std;
 
 // Mutex e variável de condição para sincronizar o turno dos jogadores
-mutex mtx;
-condition_variable cv;
-bool turnoJogador1 = true; // Controle de turno: true para jogador 1, false para jogador 2
-bool fimJogo = false;      // Flag para indicar o término do jogo
+mutex mtx;                      // Mutex para proteger o acesso a variáveis compartilhadas
+condition_variable cv;          // Variável de condição para coordenar o turno dos jogadores
+bool turnoJogador1 = true;      // Controle de turno: true para jogador 1, false para jogador 2
+bool fimJogo = false;           // Flag para indicar o término do jogo
 
 // Função para limpar a tela
 void limparTela() {
@@ -76,11 +76,17 @@ void exibirMapaInstrucoes() {
 // Função de jogada, executada em uma thread para cada jogador
 void jogar(char simbolo, string nome, char tabuleiro[3][3], int posicoes[9][2], bool &ganhou) {
     while (!fimJogo) {
+        // Bloqueia o mutex para garantir acesso exclusivo às variáveis compartilhadas
         unique_lock<mutex> lock(mtx);
-        cv.wait(lock, [=] { return (simbolo == 'X' ? turnoJogador1 : !turnoJogador1) && !fimJogo; });
+        
+        // Espera até que seja a vez deste jogador jogar ou que o jogo termine
+        cv.wait(lock, [=] { 
+            return (simbolo == 'X' ? turnoJogador1 : !turnoJogador1) && !fimJogo; 
+        });
 
         if (fimJogo) break;  // Sai do loop se o jogo já terminou
 
+        // Exibe o tabuleiro atualizado e o mapa de instruções
         limparTela();
         exibirTabuleiro(tabuleiro);
         exibirMapaInstrucoes();
@@ -89,6 +95,7 @@ void jogar(char simbolo, string nome, char tabuleiro[3][3], int posicoes[9][2], 
         bool posicaoValida = false;
         string mensagem = "";
 
+        // Laço para validar a posição escolhida pelo jogador
         while (!posicaoValida) {
             cout << mensagem << nome << ", digite uma posicao conforme o mapa (1-9): ";
             cin >> posicao;
@@ -101,6 +108,7 @@ void jogar(char simbolo, string nome, char tabuleiro[3][3], int posicoes[9][2], 
             linha = posicoes[posicao - 1][0];
             coluna = posicoes[posicao - 1][1];
 
+            // Verifica se a posição está disponível
             if (tabuleiro[linha][coluna] == '-') {
                 tabuleiro[linha][coluna] = simbolo;
                 posicaoValida = true;
@@ -109,9 +117,10 @@ void jogar(char simbolo, string nome, char tabuleiro[3][3], int posicoes[9][2], 
             }
         }
 
+        // Checa se o jogador atual venceu após a jogada
         ganhou = (conferirTabuleiro(tabuleiro) == (simbolo == 'X' ? 1 : 2));
         if (ganhou) {
-            fimJogo = true;
+            fimJogo = true;  // Indica que o jogo terminou
             limparTela();
             exibirTabuleiro(tabuleiro);
             cout << "O jogador " << nome << " venceu!!!\n";
@@ -129,8 +138,9 @@ void jogar(char simbolo, string nome, char tabuleiro[3][3], int posicoes[9][2], 
             exit(0);
         }
 
+        // Alterna o turno para o próximo jogador
         turnoJogador1 = !turnoJogador1;
-        cv.notify_all();
+        cv.notify_all();  // Notifica todas as threads para reavaliar a condição de turno
     }
 }
 
