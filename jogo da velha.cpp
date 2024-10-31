@@ -1,7 +1,6 @@
 #include <iostream>
 #include <string>
 #include <cstdlib>
-#include <ctime>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -80,11 +79,11 @@ void jogar(char simbolo, string nome, char tabuleiro[3][3], int posicoes[9][2], 
         unique_lock<mutex> lock(mtx);
         
         // Espera até que seja a vez deste jogador jogar ou que o jogo termine
-        cv.wait(lock, [=] { 
-            return (simbolo == 'X' ? turnoJogador1 : !turnoJogador1) && !fimJogo; 
+        cv.wait(lock, [simbolo] { 
+            return (simbolo == 'X' && turnoJogador1) || (simbolo == 'O' && !turnoJogador1); 
         });
 
-        if (fimJogo) break;  // Sai do loop se o jogo já terminou
+        if (fimJogo) return;  // Sai do loop se o jogo já terminou
 
         // Exibe o tabuleiro atualizado e o mapa de instruções
         limparTela();
@@ -125,7 +124,6 @@ void jogar(char simbolo, string nome, char tabuleiro[3][3], int posicoes[9][2], 
             exibirTabuleiro(tabuleiro);
             cout << "O jogador " << nome << " venceu!!!\n";
             cout << "Encerrando o jogo. Até mais!\n";
-            exit(0);
         }
 
         // Verificação de empate após a jogada
@@ -135,7 +133,6 @@ void jogar(char simbolo, string nome, char tabuleiro[3][3], int posicoes[9][2], 
             exibirTabuleiro(tabuleiro);
             cout << "\nEMPATE!!!\n";
             cout << "Encerrando o jogo. Até mais!\n";
-            exit(0);
         }
 
         // Alterna o turno para o próximo jogador
@@ -161,44 +158,14 @@ void jogo(string nome1, string nome2) {
     jogador2.join();  // Aguarda o término da thread do jogador 2
 }
 
-// Função que exibe o menu principal do jogo
-void menu() {
-    string nome1, nome2;
-    int opcao = 0;
-
-    while (opcao != 3) {
-        limparTela();
-        cout << "\nJOGO DA VELHA!!!\n1 - Jogar\n2 - Sobre o jogo\n3 - Sair\nSua opcao: ";
-        cin >> opcao;
-
-        switch (opcao) {
-            case 1:
-                cout << "\nNome do jogador 1: ";
-                cin.ignore();
-                getline(cin, nome1);
-                cout << "Nome do jogador 2: ";
-                getline(cin, nome2);
-                jogo(nome1, nome2);  // Inicia o jogo com os nomes dos jogadores
-                break;
-            case 2:
-                limparTela();
-                cout << "\nEste jogo foi desenvolvido com o uso de threads e semáforos em 2024.\n1 - Voltar\n2 - Sair\nDigite: ";
-                cin >> opcao;
-                opcao = (opcao == 1) ? 0 : 3;
-                break;
-            case 3:
-                cout << "\nAte mais!!!\n";
-                break;
-            default:
-                cout << "\nOpcao Invalida, tente novamente.\n";
-                this_thread::sleep_for(chrono::seconds(2));
-        }
-    }
-}
-
 // Função principal que inicializa o menu
 int main() {
-    srand((unsigned)time(NULL));  // Semente para geração aleatória
-    menu();  // Chama o menu principal
+    string nome1, nome2;
+    cout << "\nNome do jogador 1: ";
+    // cin.ignore();
+    getline(cin, nome1);
+    cout << "Nome do jogador 2: ";
+    getline(cin, nome2);
+    jogo(nome1, nome2);  // Inicia o jogo com os nomes dos jogadores
     return 0;
 }
